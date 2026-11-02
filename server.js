@@ -6,7 +6,9 @@ const swaggerJsdoc = require('swagger-jsdoc');
 const connectDB = require('./config/db');
 
 dotenv.config();
-connectDB();
+if (process.env.NODE_ENV !== 'test') {
+  connectDB();
+}
 
 const app = express();
 
@@ -38,7 +40,12 @@ app.use('/api/users', require('./routes/authRoutes'));
 const PORT = process.env.PORT || 5000;
 
 app.use('/api/posts', require('./routes/postRoutes'));
-app.listen(PORT, () => {
-  console.log(`Server running on port ${PORT}`);
-  console.log(`Swagger UI available at http://localhost:${PORT}/api-docs`);
-});
+if (process.env.NODE_ENV !== 'test') {
+  app.listen(PORT, () => {
+    console.log(`Server running on port ${PORT}`);
+    console.log(`Swagger UI available at http://localhost:${PORT}/api-docs`);
+  });
+}
+
+module.exports = app;
+
