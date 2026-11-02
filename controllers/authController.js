@@ -1,5 +1,4 @@
-﻿const User = require('../models/User');
-const bcrypt = require('bcryptjs');
+const User = require('../models/User');
 const jwt = require('jsonwebtoken');
 
 const generateToken = (id) => {
@@ -15,14 +14,13 @@ exports.registerUser = async (req, res) => {
       return res.status(400).json({ message: 'User already exists with this email' });
     }
 
-    const salt = await bcrypt.genSalt(10);
-    const hashedPassword = await bcrypt.hash(password, salt);
-
+    // Pass plaintext password; Mongoose pre('save') hook handles validation and hashing
     const user = await User.create({
+      name: req.body.name || 'Test User',
       username,
       email,
       phone_number,
-      password: hashedPassword,
+      password,
       profile: profile || {}
     });
 
@@ -40,6 +38,9 @@ exports.registerUser = async (req, res) => {
       }
     });
   } catch (error) {
+    if (error.name === 'ValidationError') {
+      return res.status(400).json({ message: error.message });
+    }
     res.status(500).json({ message: 'Server error', error: error.message });
   }
 };
@@ -53,7 +54,7 @@ exports.loginUser = async (req, res) => {
       return res.status(400).json({ message: 'Invalid email or password' });
     }
 
-    const isMatch = await bcrypt.compare(password, user.password);
+    const isMatch = await user.matchPassword(password);
     if (!isMatch) {
       return res.status(400).json({ message: 'Invalid email or password' });
     }
@@ -104,18 +105,14 @@ exports.updateProfile = async (req, res) => {
       return res.status(404).json({ message: 'User not found' });
     }
 
-    // Update basic fields if provided
-    user.username = req.body.username || user.username;
-    user.email = req.body.email || user.email;
-    user.phone_number = req.body.phone_number || user.phone_number;
+    if (req.body.username) user.username = req.body.username;
+    if (req.body.email) user.email = req.body.email;
+    if (req.body.phone_number) user.phone_number = req.body.phone_number;
 
-    // Handle password update with hashing if provided
     if (req.body.password) {
-      const salt = await bcrypt.genSalt(10);
-      user.password = await bcrypt.hash(req.body.password, salt);
+      user.password = req.body.password; // Triggers pre('save') validation and hashing
     }
 
-    // Update nested profile fields if provided
     if (req.body.profile) {
       user.profile.bio = req.body.profile.bio !== undefined ? req.body.profile.bio : user.profile.bio;
       user.profile.avatar = req.body.profile.avatar !== undefined ? req.body.profile.avatar : user.profile.avatar;
@@ -135,6 +132,9 @@ exports.updateProfile = async (req, res) => {
       }
     });
   } catch (error) {
+    if (error.name === 'ValidationError') {
+      return res.status(400).json({ message: error.message });
+    }
     res.status(500).json({ message: 'Server error', error: error.message });
   }
 };
